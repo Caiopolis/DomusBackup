@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
-public class ProfileService {
+public class PerfilService {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -37,7 +37,7 @@ public class ProfileService {
     @Transactional(readOnly = true)
     public DadosPerfilResponseDTO consultarPerfil(Object principal) {
         if (principal instanceof Usuario usuarioPrincipal) {
-            Usuario usuario = carregarUsuario(usuarioPrincipal.getId());
+            Usuario usuario = carregarUsuario(usuarioPrincipal);
             return montarPerfil(usuario);
         }
 
@@ -59,7 +59,7 @@ public class ProfileService {
 
     @Transactional
     public AlteracaoPerfil alterarPerfil(Object principal, DadosAtualizacaoPerfilDTO dados, MultipartFile novaFoto) {
-        Usuario usuario = usuarioDoPrincipal(principal);
+        Usuario usuario = carregarUsuario(principal);
         Pessoa pessoa = usuario.getPessoa();
 
         if (dados.nomeCompleto() != null) {
@@ -87,33 +87,28 @@ public class ProfileService {
             pessoa.setTelefone(dados.telefone());
         }
 
-        atualizarFoto(pessoa, novaFoto);
+        if (novaFoto != null && !novaFoto.isEmpty()) {
+            String fotoAntiga = pessoa.getFotoPerfil();
+            try {
+                if (fotoAntiga != null && !fotoAntiga.isBlank()) {
+                    fotoService.deletarFotoPessoa(fotoAntiga);
+                }
+                String novaFotoUrl = fotoService.uploadFotoPessoa(novaFoto);
+                pessoa.setFotoPerfil(novaFotoUrl);
+            } catch (Exception e) {
+                throw new RuntimeException("Erro ao atualizar a foto do perfil: " + e.getMessage(), e);
+            }
+        }
+
         pessoaRepository.save(pessoa);
         usuarioRepository.save(usuario);
 
         return new AlteracaoPerfil(montarPerfil(usuario), tokenService.gerarTokenUsuario(usuario));
     }
 
-    private void atualizarFoto(Pessoa pessoa, MultipartFile novaFoto) {
-        if (novaFoto == null || novaFoto.isEmpty()) {
-            return;
-        }
-
-        String fotoAntiga = pessoa.getFotoPerfil();
-        try {
-            String novaFotoUrl = fotoService.uploadFotoPessoa(novaFoto);
-            pessoa.setFotoPerfil(novaFotoUrl);
-            if (fotoAntiga != null && !fotoAntiga.isBlank()) {
-                fotoService.deletarFotoPessoa(fotoAntiga);
-            }
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Erro ao atualizar a foto do perfil", e);
-        }
-    }
-
     @Transactional
     public void excluirPerfil(Object principal) {
-        Usuario usuario = usuarioDoPrincipal(principal);
+        Usuario usuario = carregarUsuario(principal);
         Pessoa pessoa = usuario.getPessoa();
 
         if (!Boolean.TRUE.equals(pessoa.getAtivo())) {
@@ -131,15 +126,12 @@ public class ProfileService {
         pessoaRepository.save(pessoa);
     }
 
-    private Usuario usuarioDoPrincipal(Object principal) {
+    private Usuario carregarUsuario(Object principal) {
         if (!(principal instanceof Usuario usuarioPrincipal)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Esta operação não é permitida para este perfil");
         }
-        return usuarioPrincipal;
-    }
 
-    private Usuario carregarUsuario(Long id) {
-        Usuario usuario = usuarioRepository.findById(id)
+        Usuario usuario = usuarioRepository.findByIdComDadosPerfil(usuarioPrincipal.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário não encontrado"));
         if (!usuario.isEnabled()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Conta inativa");
