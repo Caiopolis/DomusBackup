@@ -3,7 +3,7 @@ package com.domus.tcc.backend.controller;
 import com.domus.tcc.backend.dto.request.DadosAtualizacaoPerfilDTO;
 import com.domus.tcc.backend.dto.response.DadosPerfilResponseDTO;
 import com.domus.tcc.backend.security.JwtCookieUtil;
-import com.domus.tcc.backend.services.ProfileService;
+import com.domus.tcc.backend.services.PerfilService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -22,15 +22,15 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/auth/eu/perfil")
 public class ProfileController {
 
-    private final ProfileService profileService;
+    private final PerfilService perfilService;
 
-    public ProfileController(ProfileService profileService) {
-        this.profileService = profileService;
+    public ProfileController(PerfilService perfilService) {
+        this.perfilService = perfilService;
     }
 
     @GetMapping
     public ResponseEntity<DadosPerfilResponseDTO> consultarPerfil(Authentication authentication) {
-        return ResponseEntity.ok(profileService.consultarPerfil(authentication.getPrincipal()));
+        return ResponseEntity.ok(perfilService.consultarPerfil(authentication.getPrincipal()));
     }
 
     @PutMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -41,8 +41,8 @@ public class ProfileController {
             @RequestParam(value = "foto", required = false) MultipartFile foto
     ) {
         MultipartFile fotoRecebida = arquivo != null && !arquivo.isEmpty() ? arquivo : foto;
-        ProfileService.AlteracaoPerfil alteracao =
-                profileService.alterarPerfil(authentication.getPrincipal(), dados, fotoRecebida);
+        PerfilService.AlteracaoPerfil alteracao =
+                perfilService.alterarPerfil(authentication.getPrincipal(), dados, fotoRecebida);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, JwtCookieUtil.criar(alteracao.tokenJwt()).toString())
                 .body(alteracao.perfil());
@@ -50,7 +50,7 @@ public class ProfileController {
 
     @DeleteMapping
     public ResponseEntity<Void> excluirPerfil(Authentication authentication) {
-        profileService.excluirPerfil(authentication.getPrincipal());
+        perfilService.excluirPerfil(authentication.getPrincipal());
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, JwtCookieUtil.limpar().toString())
                 .build();
