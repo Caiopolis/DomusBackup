@@ -11,6 +11,8 @@ import com.domus.tcc.backend.security.Usuario;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Long>{
 
+    boolean existsByUsernameIgnoreCaseAndIdNot(String username, Long id);
+
     @Query("SELECT u FROM Usuario u JOIN FETCH u.pessoa JOIN FETCH u.papel WHERE u.username = :username")
     UserDetails findByUsername(@Param("username") String username);
 
